@@ -1,0 +1,230 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role { SUPER_ADMIN STAFF CUSTOMER }
+enum OrderStatus { PENDING CONFIRMED PREPARING OUT_FOR_DELIVERY DELIVERED CANCELLED }
+enum PaymentMethod { COD }
+enum PaymentStatus { PENDING PAID FAILED REFUNDED }
+enum ItemType { PRODUCT CUSTOM_BOUQUET }
+enum CouponType { PERCENT FIXED }
+
+model User {
+  id            String        @id @default(cuid())
+  name          String?
+  email         String        @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  role          Role          @default(CUSTOMER)
+  addresses     Address[]
+  savedDesigns  SavedDesign[]
+  carts         Cart[]
+  orders        Order[]
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  country   String
+  city      String
+  area      String
+  street    String
+  building  String
+  phone     String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  products Product[]
+}
+
+model Product {
+  id          String         @id @default(cuid())
+  categoryId  String
+  name        String
+  slug        String         @unique
+  description String
+  price       Decimal        @db.Decimal(10, 2)
+  salePrice   Decimal?       @db.Decimal(10, 2)
+  stock       Int            @default(0)
+  featured    Boolean        @default(false)
+  active      Boolean        @default(true)
+  category    Category       @relation(fields: [categoryId], references: [id])
+  images      ProductImage[]
+  cartItems   CartItem[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  imageUrl  String
+  sortOrder Int     @default(0)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Flower {
+  id          String          @id @default(cuid())
+  name        String
+  description String
+  basePrice   Decimal         @db.Decimal(10, 2)
+  stock       Int             @default(0)
+  active      Boolean         @default(true)
+  variants    FlowerVariant[]
+}
+
+model FlowerVariant {
+  id              String  @id @default(cuid())
+  flowerId        String
+  color           String
+  imageUrl        String
+  layerOrder      Int     @default(20)
+  additionalPrice Decimal @default(0) @db.Decimal(10, 2)
+  flower          Flower  @relation(fields: [flowerId], references: [id], onDelete: Cascade)
+}
+
+model Wrapper { id String @id @default(cuid()) name String color String? imageUrl String price Decimal @db.Decimal(10, 2) layerOrder Int @default(10) active Boolean @default(true) }
+model Ribbon { id String @id @default(cuid()) name String color String? imageUrl String price Decimal @db.Decimal(10, 2) layerOrder Int @default(40) active Boolean @default(true) }
+model Filler { id String @id @default(cuid()) name String imageUrl String price Decimal @db.Decimal(10, 2) layerOrder Int @default(30) active Boolean @default(true) }
+model Accessory { id String @id @default(cuid()) name String imageUrl String price Decimal @db.Decimal(10, 2) stock Int @default(0) active Boolean @default(true) }
+
+model SavedDesign {
+  id              String     @id @default(cuid())
+  userId          String?
+  sessionId       String?
+  designJson      Json
+  previewImageUrl String?
+  totalPrice      Decimal    @db.Decimal(10, 2)
+  user            User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  cartItems       CartItem[]
+  createdAt       DateTime   @default(now())
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String?
+  sessionId String?
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        String       @id @default(cuid())
+  cartId    String
+  itemType  ItemType
+  productId String?
+  designId  String?
+  quantity  Int
+  unitPrice Decimal      @db.Decimal(10, 2)
+  cart      Cart         @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product   Product?     @relation(fields: [productId], references: [id])
+  design    SavedDesign? @relation(fields: [designId], references: [id])
+}
+
+model Order {
+  id                  String        @id @default(cuid())
+  orderNumber         String        @unique
+  userId              String?
+  customerName        String
+  email               String
+  phone               String
+  status              OrderStatus   @default(PENDING)
+  subtotal            Decimal       @db.Decimal(10, 2)
+  deliveryFee         Decimal       @db.Decimal(10, 2)
+  discount            Decimal       @default(0) @db.Decimal(10, 2)
+  total               Decimal       @db.Decimal(10, 2)
+  paymentMethod       PaymentMethod @default(COD)
+  paymentStatus       PaymentStatus @default(PENDING)
+  deliveryDate        DateTime
+  deliveryTime        String
+  notes               String?
+  shippingAddressJson Json
+  user                User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items               OrderItem[]
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  @@index([status])
+}
+
+model OrderItem {
+  id                 String  @id @default(cuid())
+  orderId            String
+  itemType           ItemType
+  productId          String?
+  designSnapshotJson Json?
+  quantity           Int
+  unitPrice          Decimal @db.Decimal(10, 2)
+  totalPrice         Decimal @db.Decimal(10, 2)
+  order              Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Coupon {
+  id             String     @id @default(cuid())
+  code           String     @unique
+  type           CouponType
+  value          Decimal    @db.Decimal(10, 2)
+  minOrderAmount Decimal?   @db.Decimal(10, 2)
+  startDate      DateTime?
+  endDate        DateTime?
+  usageLimit     Int?
+  active         Boolean    @default(true)
+}
+
+model Setting {
+  id                   String @id @default(cuid())
+  storeName            String @default("Bloom Studio")
+  logoUrl              String?
+  primaryColor         String @default("#be3a62")
+  currency             String @default("USD")
+  deliverySettingsJson Json
+  contactInfoJson      Json
+}

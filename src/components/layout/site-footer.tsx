@@ -1,0 +1,3 @@
+export function SiteFooter() {
+  return <footer className="mt-20 border-t border-[var(--border)] bg-white"><div className="mx-auto grid max-w-7xl gap-6 px-4 py-10 md:grid-cols-3"><div><strong>Bloom Studio</strong><p className="mt-2 text-sm text-[var(--muted-foreground)]">Custom bouquets, same-day delivery zones, and premium floral design.</p></div><div><strong>Delivery</strong><p className="mt-2 text-sm text-[var(--muted-foreground)]">Schedule morning, afternoon, or evening delivery at checkout.</p></div><div><strong>Contact</strong><p className="mt-2 text-sm text-[var(--muted-foreground)]">hello@bloomstudio.example · (555) 010-2026</p></div></div></footer>;
+}

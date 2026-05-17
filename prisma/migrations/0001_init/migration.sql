@@ -1,0 +1,33 @@
+CREATE TYPE "Role" AS ENUM ('SUPER_ADMIN', 'STAFF', 'CUSTOMER');
+CREATE TYPE "OrderStatus" AS ENUM ('PENDING', 'CONFIRMED', 'PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED');
+CREATE TYPE "PaymentMethod" AS ENUM ('COD');
+CREATE TYPE "PaymentStatus" AS ENUM ('PENDING', 'PAID', 'FAILED', 'REFUNDED');
+CREATE TYPE "ItemType" AS ENUM ('PRODUCT', 'CUSTOM_BOUQUET');
+CREATE TYPE "CouponType" AS ENUM ('PERCENT', 'FIXED');
+
+CREATE TABLE "User" ("id" TEXT PRIMARY KEY, "name" TEXT, "email" TEXT NOT NULL UNIQUE, "emailVerified" TIMESTAMP(3), "image" TEXT, "passwordHash" TEXT, "role" "Role" NOT NULL DEFAULT 'CUSTOMER', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "Account" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL REFERENCES "User"("id") ON DELETE CASCADE, "type" TEXT NOT NULL, "provider" TEXT NOT NULL, "providerAccountId" TEXT NOT NULL, "refresh_token" TEXT, "access_token" TEXT, "expires_at" INTEGER, "token_type" TEXT, "scope" TEXT, "id_token" TEXT, "session_state" TEXT, UNIQUE("provider", "providerAccountId"));
+CREATE TABLE "Session" ("id" TEXT PRIMARY KEY, "sessionToken" TEXT NOT NULL UNIQUE, "userId" TEXT NOT NULL REFERENCES "User"("id") ON DELETE CASCADE, "expires" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "VerificationToken" ("identifier" TEXT NOT NULL, "token" TEXT NOT NULL UNIQUE, "expires" TIMESTAMP(3) NOT NULL, UNIQUE("identifier", "token"));
+CREATE TABLE "Address" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL REFERENCES "User"("id") ON DELETE CASCADE, "country" TEXT NOT NULL, "city" TEXT NOT NULL, "area" TEXT NOT NULL, "street" TEXT NOT NULL, "building" TEXT NOT NULL, "phone" TEXT NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE "Category" ("id" TEXT PRIMARY KEY, "name" TEXT NOT NULL, "slug" TEXT NOT NULL UNIQUE);
+CREATE TABLE "Product" ("id" TEXT PRIMARY KEY, "categoryId" TEXT NOT NULL REFERENCES "Category"("id"), "name" TEXT NOT NULL, "slug" TEXT NOT NULL UNIQUE, "description" TEXT NOT NULL, "price" DECIMAL(10,2) NOT NULL, "salePrice" DECIMAL(10,2), "stock" INTEGER NOT NULL DEFAULT 0, "featured" BOOLEAN NOT NULL DEFAULT false, "active" BOOLEAN NOT NULL DEFAULT true, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "ProductImage" ("id" TEXT PRIMARY KEY, "productId" TEXT NOT NULL REFERENCES "Product"("id") ON DELETE CASCADE, "imageUrl" TEXT NOT NULL, "sortOrder" INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE "Flower" ("id" TEXT PRIMARY KEY, "name" TEXT NOT NULL, "description" TEXT NOT NULL, "basePrice" DECIMAL(10,2) NOT NULL, "stock" INTEGER NOT NULL DEFAULT 0, "active" BOOLEAN NOT NULL DEFAULT true);
+CREATE TABLE "FlowerVariant" ("id" TEXT PRIMARY KEY, "flowerId" TEXT NOT NULL REFERENCES "Flower"("id") ON DELETE CASCADE, "color" TEXT NOT NULL, "imageUrl" TEXT NOT NULL, "layerOrder" INTEGER NOT NULL DEFAULT 20, "additionalPrice" DECIMAL(10,2) NOT NULL DEFAULT 0);
+CREATE TABLE "Wrapper" ("id" TEXT PRIMARY KEY, "name" TEXT NOT NULL, "color" TEXT, "imageUrl" TEXT NOT NULL, "price" DECIMAL(10,2) NOT NULL, "layerOrder" INTEGER NOT NULL DEFAULT 10, "active" BOOLEAN NOT NULL DEFAULT true);
+CREATE TABLE "Ribbon" ("id" TEXT PRIMARY KEY, "name" TEXT NOT NULL, "color" TEXT, "imageUrl" TEXT NOT NULL, "price" DECIMAL(10,2) NOT NULL, "layerOrder" INTEGER NOT NULL DEFAULT 40, "active" BOOLEAN NOT NULL DEFAULT true);
+CREATE TABLE "Filler" ("id" TEXT PRIMARY KEY, "name" TEXT NOT NULL, "imageUrl" TEXT NOT NULL, "price" DECIMAL(10,2) NOT NULL, "layerOrder" INTEGER NOT NULL DEFAULT 30, "active" BOOLEAN NOT NULL DEFAULT true);
+CREATE TABLE "Accessory" ("id" TEXT PRIMARY KEY, "name" TEXT NOT NULL, "imageUrl" TEXT NOT NULL, "price" DECIMAL(10,2) NOT NULL, "stock" INTEGER NOT NULL DEFAULT 0, "active" BOOLEAN NOT NULL DEFAULT true);
+CREATE TABLE "SavedDesign" ("id" TEXT PRIMARY KEY, "userId" TEXT REFERENCES "User"("id") ON DELETE SET NULL, "sessionId" TEXT, "designJson" JSONB NOT NULL, "previewImageUrl" TEXT, "totalPrice" DECIMAL(10,2) NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE "Cart" ("id" TEXT PRIMARY KEY, "userId" TEXT REFERENCES "User"("id") ON DELETE SET NULL, "sessionId" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "CartItem" ("id" TEXT PRIMARY KEY, "cartId" TEXT NOT NULL REFERENCES "Cart"("id") ON DELETE CASCADE, "itemType" "ItemType" NOT NULL, "productId" TEXT REFERENCES "Product"("id"), "designId" TEXT REFERENCES "SavedDesign"("id"), "quantity" INTEGER NOT NULL, "unitPrice" DECIMAL(10,2) NOT NULL);
+CREATE TABLE "Order" ("id" TEXT PRIMARY KEY, "orderNumber" TEXT NOT NULL UNIQUE, "userId" TEXT REFERENCES "User"("id") ON DELETE SET NULL, "customerName" TEXT NOT NULL, "email" TEXT NOT NULL, "phone" TEXT NOT NULL, "status" "OrderStatus" NOT NULL DEFAULT 'PENDING', "subtotal" DECIMAL(10,2) NOT NULL, "deliveryFee" DECIMAL(10,2) NOT NULL, "discount" DECIMAL(10,2) NOT NULL DEFAULT 0, "total" DECIMAL(10,2) NOT NULL, "paymentMethod" "PaymentMethod" NOT NULL DEFAULT 'COD', "paymentStatus" "PaymentStatus" NOT NULL DEFAULT 'PENDING', "deliveryDate" TIMESTAMP(3) NOT NULL, "deliveryTime" TEXT NOT NULL, "notes" TEXT, "shippingAddressJson" JSONB NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "OrderItem" ("id" TEXT PRIMARY KEY, "orderId" TEXT NOT NULL REFERENCES "Order"("id") ON DELETE CASCADE, "itemType" "ItemType" NOT NULL, "productId" TEXT, "designSnapshotJson" JSONB, "quantity" INTEGER NOT NULL, "unitPrice" DECIMAL(10,2) NOT NULL, "totalPrice" DECIMAL(10,2) NOT NULL);
+CREATE TABLE "Coupon" ("id" TEXT PRIMARY KEY, "code" TEXT NOT NULL UNIQUE, "type" "CouponType" NOT NULL, "value" DECIMAL(10,2) NOT NULL, "minOrderAmount" DECIMAL(10,2), "startDate" TIMESTAMP(3), "endDate" TIMESTAMP(3), "usageLimit" INTEGER, "active" BOOLEAN NOT NULL DEFAULT true);
+CREATE TABLE "Setting" ("id" TEXT PRIMARY KEY, "storeName" TEXT NOT NULL DEFAULT 'Bloom Studio', "logoUrl" TEXT, "primaryColor" TEXT NOT NULL DEFAULT '#be3a62', "currency" TEXT NOT NULL DEFAULT 'USD', "deliverySettingsJson" JSONB NOT NULL, "contactInfoJson" JSONB NOT NULL);
+
+CREATE INDEX "Order_status_idx" ON "Order"("status");
+CREATE INDEX "Product_slug_idx" ON "Product"("slug");
+CREATE INDEX "Category_slug_idx" ON "Category"("slug");
+CREATE INDEX "Coupon_code_idx" ON "Coupon"("code");
